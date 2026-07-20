@@ -69,8 +69,8 @@ writer-snowflake-demos/
         ├── 04_ai_layer.sql                ← Cortex Search, Semantic View, Agent, MCP Server
         ├── 05_analytics_and_grants.sql    ← Performance DT + final grants
         ├── 06_phase2_optional.sql         ← Sentiment, GEO, brand voice (optional)
-        ├── 00_teardown.sql                ← Full teardown
         ├── 99_demo_reset.sql              ← Reset between demo runs
+        ├── 99_teardown.sql                ← Full teardown (decommission only)
         └── SETUP_NOTES.md                 ← Known issues and fixes
 ```
 

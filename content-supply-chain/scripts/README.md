@@ -117,7 +117,7 @@ SHOW INTEGRATIONS LIKE 'WRITER_OAUTH';  -- should return 1 row
 To wipe all demo objects and start fresh:
 
 ```bash
-snow sql -f 00_teardown.sql -c demo490
+snow sql -f 99_teardown.sql -c demo490
 ```
 
 This drops `WRITER_SNOW_DEMO.MARKETING` schema and `WRITER_MARKETING_ROLE`. It does **not** touch other schemas or databases.
