@@ -54,20 +54,12 @@ Open each script in a Snowsight worksheet and run in order. Use **Run All** (⌘
 
 | Step | Script | Est. Time | Notes |
 |------|--------|-----------|-------|
-| 1 | `00_setup.sql` | 30 sec | ⚠️ See "Fresh Account" note below |
-| 2 | `01_reference_tables.sql` | 30 sec | |
-| 3 | `02_generate_bronze.sql` | 5–10 min | Generates 2.2M rows |
-| 4 | `04_dynamic_tables.sql` | 1 min | DTs initialize in background |
-| 5 | `05_campaign_library.sql` | 3–5 min | 300 CORTEX.COMPLETE calls |
-| 6 | `06_content_tables.sql` | 15 sec | |
-| 7 | `07_stored_procedures.sql` | 15 sec | |
-| 8 | `08_cortex_search.sql` | 1 min | Wait 1–5 min after for indexing |
-| 9 | `09_semantic_view.sql` | 15 sec | |
-| 10 | `10_cortex_agent.sql` | 15 sec | |
-| 11 | `11_mcp_server.sql` | 15 sec | |
-| 12 | `12_perf_gold.sql` | 1 min | |
-| 13 | `13_phase2_objects.sql` | 10–20 min | Optional — not needed for Phase 1 |
-| 14 | `14_grants.sql` | 15 sec | |
+| 1 | `01_setup_and_foundation.sql` | <2 min | ⚠️ See "Fresh Account" note below. Includes env + all reference tables. |
+| 2 | `02_bronze_data.sql` | 5–10 min | Generates 50K customers, 2.2M events — recommend MEDIUM+ warehouse |
+| 3 | `03_data_model.sql` | 5–8 min | DTs + AI-generated campaign library (300 CORTEX.COMPLETE calls) + write-back tables + procs |
+| 4 | `04_ai_layer.sql` | <3 min | Cortex Search + Semantic View + Agent + MCP Server. Wait 1–5 min after for Search indexing. |
+| 5 | `05_analytics_and_grants.sql` | <2 min | Performance analytics DT + final grant sweep |
+| 6 | `06_phase2_optional.sql` | 10–20 min | **Optional** — not needed for Phase 1 demo |
 
 ---
 
@@ -75,7 +67,7 @@ Open each script in a Snowsight worksheet and run in order. Use **Run All** (⌘
 
 On a fresh Snowflake account, SYSADMIN does not have `CREATE AGENT` or `CREATE MCP SERVER` by default.
 
-**Before running `00_setup.sql`**, uncomment and run the ACCOUNTADMIN block at the top:
+**Before running `01_setup_and_foundation.sql`**, uncomment and run the ACCOUNTADMIN block at the top:
 
 ```sql
 USE ROLE ACCOUNTADMIN;
@@ -86,7 +78,7 @@ GRANT CREATE AGENT                 ON SCHEMA WRITER_SNOW_DEMO.MARKETING TO ROLE 
 GRANT CREATE MCP SERVER            ON SCHEMA WRITER_SNOW_DEMO.MARKETING TO ROLE SYSADMIN;
 ```
 
-Also update the `DEMO_USER` in `00_setup.sql` to your actual Snowflake username.
+Also update the `DEMO_USER` in `01_setup_and_foundation.sql` to your actual Snowflake username.
 
 ---
 
@@ -97,7 +89,7 @@ Writer connects to the MCP server via OAuth using the `WRITER_OAUTH` security in
 ### What's already configured
 - `WRITER_OAUTH` Custom OAuth integration exists in this account
 - Redirect URI is set to `https://app.writer.com/mcp/oauth/callback`
-- `GRANT USAGE ON INTEGRATION WRITER_OAUTH TO ROLE WRITER_MARKETING_ROLE` is in `00_setup.sql`
+- `GRANT USAGE ON INTEGRATION WRITER_OAUTH TO ROLE WRITER_MARKETING_ROLE` is in `01_setup_and_foundation.sql`
 
 ### What Writer's team needs to configure in Writer
 To connect Writer to the MCP server, provide Writer's team with:
@@ -168,7 +160,7 @@ See **SETUP_NOTES.md** for all known issues and fixes.
 
 | Error | Fix |
 |-------|-----|
-| `CREATE AGENT failed` | Uncomment ACCOUNTADMIN block in `00_setup.sql` |
+| `CREATE AGENT failed` | Uncomment ACCOUNTADMIN block in `01_setup_and_foundation.sql` |
 | `Model "claude-haiku-4-5" unavailable` | Enable cross-region inference or check regional availability |
 | `Agent returned empty response` | Verify `execution_environment.warehouse: WRITER_WH` in `10_cortex_agent.sql` |
 | `WRITER_OAUTH: insufficient privileges` | Ensure `GRANT USAGE ON INTEGRATION WRITER_OAUTH` ran successfully |

@@ -56,31 +56,22 @@ SELECT SYSTEM$SHOW_OAUTH_CLIENT_SECRETS('WRITER_OAUTH');
 
 ```
 writer-snowflake-demos/
-├── README.md                        ← You are here
+├── README.md                              ← You are here
 ├── .gitignore
 ├── LICENSE
 └── content-supply-chain/
-    ├── scripts/
-    │   ├── README.md                ← Demo-specific setup guide
-    │   ├── run_all.sh               ← One-command setup
-    │   ├── 00_setup.sql             ← Database, schema, role, OAuth ref
-    │   ├── 00_teardown.sql          ← Full teardown
-    │   ├── 01_reference_tables.sql
-    │   ├── 02_generate_bronze.sql   ← 50K customers, 2.2M events
-    │   ├── 04_dynamic_tables.sql    ← CUSTOMER_360, MICRO_SEGMENTS
-    │   ├── 05_campaign_library.sql  ← 100 AI-generated campaigns
-    │   ├── 06_content_tables.sql    ← Write-back tables
-    │   ├── 07_stored_procedures.sql ← ACTIVATE_SEGMENT, SAVE_BRIEF, SAVE_CONTENT_ASSET
-    │   ├── 08_cortex_search.sql     ← Campaign search services
-    │   ├── 09_semantic_view.sql     ← CUSTOMER_360_SV
-    │   ├── 10_cortex_agent.sql      ← MARKETING_CAMPAIGN_PLANNER
-    │   ├── 11_mcp_server.sql        ← MARKETING_MCP_SERVER (5 tools)
-    │   ├── 12_perf_gold.sql         ← CAMPAIGN_PERFORMANCE_GOLD DT
-    │   ├── 13_phase2_objects.sql    ← Sentiment, GEO, brand voice (optional)
-    │   ├── 14_grants.sql            ← Final grant sweep
-    │   ├── 99_demo_reset.sql        ← Reset between demo runs
-    │   └── SETUP_NOTES.md           ← Known issues and fixes
-    └── (architecture diagram, spec — not committed)
+    └── scripts/
+        ├── README.md                      ← Demo-specific setup guide
+        ├── run_all.sh                     ← One-command setup
+        ├── 01_setup_and_foundation.sql    ← Database, schema, role, reference tables
+        ├── 02_bronze_data.sql             ← 50K customers, 2.2M events (5–10 min)
+        ├── 03_data_model.sql              ← DTs, campaign library, write-back tables, procs
+        ├── 04_ai_layer.sql                ← Cortex Search, Semantic View, Agent, MCP Server
+        ├── 05_analytics_and_grants.sql    ← Performance DT + final grants
+        ├── 06_phase2_optional.sql         ← Sentiment, GEO, brand voice (optional)
+        ├── 00_teardown.sql                ← Full teardown
+        ├── 99_demo_reset.sql              ← Reset between demo runs
+        └── SETUP_NOTES.md                 ← Known issues and fixes
 ```
 
 ---

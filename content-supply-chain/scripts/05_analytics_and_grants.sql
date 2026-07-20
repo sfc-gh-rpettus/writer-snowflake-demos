@@ -1,19 +1,20 @@
 -- =============================================================================
--- 12_perf_gold.sql  —  Apex Athletics Content Supply Chain
--- Creates: CAMPAIGN_PERFORMANCE_GOLD Dynamic Table
--- Joins CAMPAIGN_EVENTS + CAMPAIGN_LIBRARY + MICRO_SEGMENTS for CoWork analytics.
--- Also pre-loads PAID_MEDIA_PERFORMANCE with synthetic ad platform data
--- (used as a source table for this DT).
+-- 05_analytics_and_grants.sql  —  Apex Athletics Content Supply Chain
+-- Step 5 of 6 — Run time: <2 min
+--
+-- Creates:
+--   • PAID_MEDIA_PERFORMANCE table (18K synthetic ad platform rows)
+--   • CAMPAIGN_PERFORMANCE_GOLD Dynamic Table (CTR/CVR/ROAS/CAC, Act 4 CoWork)
+--   • Final grant sweep ensuring WRITER_MARKETING_ROLE has access to all objects
 -- =============================================================================
 
 USE ROLE SYSADMIN;
 USE WAREHOUSE WRITER_WH;
-USE SCHEMA WRITER_SNOW_DEMO.MARKETING;
 
--- ---------------------------------------------------------------------------
--- PAID_MEDIA_PERFORMANCE — synthetic ad platform performance data
--- Pre-loaded (no live Snowpipe wiring — synthetic data is sufficient for demo)
--- ---------------------------------------------------------------------------
+
+-- ──────────────────────────────────────────────────────────────────────────
+-- PERFORMANCE ANALYTICS  (from 12_perf_gold.sql)
+-- ──────────────────────────────────────────────────────────────────────────
 CREATE OR REPLACE TABLE WRITER_SNOW_DEMO.MARKETING.PAID_MEDIA_PERFORMANCE (
   RECORD_ID      VARCHAR(20)   NOT NULL,
   CAMPAIGN_ID    VARCHAR(15),
@@ -164,3 +165,76 @@ WHERE PERIOD IS NOT NULL;
 
 GRANT SELECT ON DYNAMIC TABLE WRITER_SNOW_DEMO.MARKETING.CAMPAIGN_PERFORMANCE_GOLD
   TO ROLE WRITER_MARKETING_ROLE;
+
+-- ──────────────────────────────────────────────────────────────────────────
+-- FINAL GRANT SWEEP  (from 14_grants.sql)
+-- ──────────────────────────────────────────────────────────────────────────
+GRANT USAGE ON DATABASE WRITER_SNOW_DEMO           TO ROLE WRITER_MARKETING_ROLE;
+GRANT USAGE ON SCHEMA   WRITER_SNOW_DEMO.MARKETING TO ROLE WRITER_MARKETING_ROLE;
+
+-- ---------------------------------------------------------------------------
+-- Warehouse (idempotent)
+-- ---------------------------------------------------------------------------
+GRANT USAGE, OPERATE ON WAREHOUSE WRITER_WH TO ROLE WRITER_MARKETING_ROLE;
+
+-- ---------------------------------------------------------------------------
+-- All regular tables — bulk SELECT
+-- ---------------------------------------------------------------------------
+GRANT SELECT ON ALL TABLES IN SCHEMA WRITER_SNOW_DEMO.MARKETING TO ROLE WRITER_MARKETING_ROLE;
+
+-- Write-back tables — Writer needs INSERT too
+GRANT SELECT, INSERT ON TABLE WRITER_SNOW_DEMO.MARKETING.CAMPAIGN_BRIEFS    TO ROLE WRITER_MARKETING_ROLE;
+GRANT SELECT, INSERT ON TABLE WRITER_SNOW_DEMO.MARKETING.CONTENT_ASSETS     TO ROLE WRITER_MARKETING_ROLE;
+GRANT SELECT, INSERT ON TABLE WRITER_SNOW_DEMO.MARKETING.CAMPAIGN_AUDIENCES TO ROLE WRITER_MARKETING_ROLE;
+
+-- ---------------------------------------------------------------------------
+-- Dynamic Tables — bulk SELECT
+-- ---------------------------------------------------------------------------
+GRANT SELECT ON ALL DYNAMIC TABLES IN SCHEMA WRITER_SNOW_DEMO.MARKETING TO ROLE WRITER_MARKETING_ROLE;
+
+-- ---------------------------------------------------------------------------
+-- Stored Procedures
+-- ---------------------------------------------------------------------------
+GRANT USAGE ON PROCEDURE WRITER_SNOW_DEMO.MARKETING.ACTIVATE_SEGMENT(NUMBER, VARCHAR, VARCHAR)
+  TO ROLE WRITER_MARKETING_ROLE;
+GRANT USAGE ON PROCEDURE WRITER_SNOW_DEMO.MARKETING.SAVE_BRIEF(VARCHAR, VARIANT)
+  TO ROLE WRITER_MARKETING_ROLE;
+GRANT USAGE ON PROCEDURE WRITER_SNOW_DEMO.MARKETING.SAVE_CONTENT_ASSET(VARCHAR, VARIANT)
+  TO ROLE WRITER_MARKETING_ROLE;
+
+-- ---------------------------------------------------------------------------
+-- Cortex Search Services
+-- ---------------------------------------------------------------------------
+GRANT USAGE ON CORTEX SEARCH SERVICE WRITER_SNOW_DEMO.MARKETING.CAMPAIGN_LIBRARY_SEARCH
+  TO ROLE WRITER_MARKETING_ROLE;
+GRANT USAGE ON CORTEX SEARCH SERVICE WRITER_SNOW_DEMO.MARKETING.CAMPAIGN_BRIEFS_SEARCH
+  TO ROLE WRITER_MARKETING_ROLE;
+
+-- ---------------------------------------------------------------------------
+-- Semantic View
+-- ---------------------------------------------------------------------------
+GRANT SELECT ON VIEW WRITER_SNOW_DEMO.MARKETING.CUSTOMER_360_SV TO ROLE WRITER_MARKETING_ROLE;
+
+-- ---------------------------------------------------------------------------
+-- Cortex Agent
+-- ---------------------------------------------------------------------------
+GRANT USAGE ON AGENT WRITER_SNOW_DEMO.MARKETING.MARKETING_CAMPAIGN_PLANNER
+  TO ROLE WRITER_MARKETING_ROLE;
+
+-- ---------------------------------------------------------------------------
+-- MCP Server
+-- ---------------------------------------------------------------------------
+GRANT USAGE ON MCP SERVER WRITER_SNOW_DEMO.MARKETING.MARKETING_MCP_SERVER
+  TO ROLE WRITER_MARKETING_ROLE;
+
+-- ---------------------------------------------------------------------------
+-- Future-proof grants (auto-grant new objects)
+-- ---------------------------------------------------------------------------
+GRANT SELECT ON FUTURE TABLES         IN SCHEMA WRITER_SNOW_DEMO.MARKETING TO ROLE WRITER_MARKETING_ROLE;
+GRANT SELECT ON FUTURE DYNAMIC TABLES IN SCHEMA WRITER_SNOW_DEMO.MARKETING TO ROLE WRITER_MARKETING_ROLE;
+GRANT SELECT ON FUTURE VIEWS          IN SCHEMA WRITER_SNOW_DEMO.MARKETING TO ROLE WRITER_MARKETING_ROLE;
+
+-- ---------------------------------------------------------------------------
+-- Verification
+-- ---------------------------------------------------------------------------
+SHOW GRANTS TO ROLE WRITER_MARKETING_ROLE;

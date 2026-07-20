@@ -1,21 +1,23 @@
 -- =============================================================================
--- 13_phase2_objects.sql  —  Apex Athletics Content Supply Chain
--- Phase 2 Demo Objects (build now, show in follow-up conversations):
--- • PRODUCT_SENTIMENT_SCORES — gear review sentiment via CORTEX.SENTIMENT
--- • GEO_SEARCH_QUERIES — synthetic AI-search impression data
--- • BRAND_VOICE_GUIDELINES — Apex Athletics brand rules
--- • CHANNEL_TEMPLATES — format constraints per channel
+-- 06_phase2_optional.sql  —  Apex Athletics Content Supply Chain
+-- Step 6 of 6 — OPTIONAL — Run time: 10–20 min
+--
+-- NOT required for the Phase 1 demo walkthrough.
+-- Creates Phase 2 objects for follow-up conversations:
+--   • PRODUCT_SENTIMENT_SCORES (CORTEX.SENTIMENT on ~120K gear reviews — slow)
+--   • GEO_SEARCH_QUERIES (150 AI-generated AI-search impression rows)
+--   • BRAND_VOICE_GUIDELINES (12 brand rules — governance layer)
+--   • CHANNEL_TEMPLATES (10 channel format specs)
+--
+-- Phase 2 demo talking points (if asked):
+--   Sentiment: "We run CORTEX.SENTIMENT on every gear review — feeds content tone"
+--   GEO:       "GEO_SEARCH_QUERIES tracks Perplexity and ChatGPT brand citations"
+--   Brand:     "Every brand rule Writer applies is version-controlled in Snowflake"
 -- =============================================================================
 
 USE ROLE SYSADMIN;
 USE WAREHOUSE WRITER_WH;
-USE SCHEMA WRITER_SNOW_DEMO.MARKETING;
 
--- ---------------------------------------------------------------------------
--- PRODUCT_SENTIMENT_SCORES — aggregated sentiment from gear_review events
--- Populated via CORTEX.SENTIMENT on gear review text
--- Phase 2 talking point: "We run sentiment analysis on every gear review event"
--- ---------------------------------------------------------------------------
 CREATE OR REPLACE TABLE WRITER_SNOW_DEMO.MARKETING.PRODUCT_SENTIMENT_SCORES (
   PRODUCT_SENTIMENT_ID   NUMBER AUTOINCREMENT PRIMARY KEY,
   CATEGORY_ID            VARCHAR(10),

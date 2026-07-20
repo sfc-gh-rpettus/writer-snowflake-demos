@@ -1,22 +1,15 @@
 -- =============================================================================
--- 02_generate_bronze.sql  —  Apex Athletics Content Supply Chain
--- Generates: CUSTOMERS (50K), EVENT_STREAM (~2M), CAMPAIGN_EVENTS (156K)
--- Pure SQL using TABLE(GENERATOR(ROWCOUNT => N)) — no Python required.
+-- 02_bronze_data.sql  —  Apex Athletics Content Supply Chain
+-- Step 2 of 6 — Run time: 5–10 min (recommend MEDIUM+ warehouse)
 --
--- Customer cohort design (MOD(g.n, 10)):
---   Cohorts 0-6, 9: Normal active customers (purchases 0-181 days ago)
---   Cohort 7 (at-risk): Purchases 181-365 days ago → High churn, high frequency
---   Cohort 8 (dormant): Purchases 366-730 days ago → outside 12m window → null purchase metrics
--- This produces all 8 RFM segments needed for MICRO_SEGMENTS.
+-- Generates: CUSTOMERS (50K), EVENT_STREAM (~2.2M), CAMPAIGN_EVENTS (156K)
+-- Pure SQL using TABLE(GENERATOR()) — no Python required.
+-- Uses cohort-based purchase timing to produce all 8 RFM segment types.
 -- =============================================================================
 
 USE ROLE SYSADMIN;
 USE WAREHOUSE WRITER_WH;
-USE SCHEMA WRITER_SNOW_DEMO.MARKETING;
 
--- ---------------------------------------------------------------------------
--- CUSTOMERS — 50,000 rows
--- ---------------------------------------------------------------------------
 CREATE OR REPLACE TABLE WRITER_SNOW_DEMO.MARKETING.CUSTOMERS (
   CUSTOMER_ID          VARCHAR(12)   NOT NULL,
   FIRST_NAME           VARCHAR(50)   NOT NULL,
