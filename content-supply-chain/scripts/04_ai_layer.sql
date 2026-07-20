@@ -318,3 +318,24 @@ CREATE OR REPLACE MCP SERVER WRITER_SNOW_DEMO.MARKETING.MARKETING_MCP_SERVER
 
 GRANT USAGE ON MCP SERVER WRITER_SNOW_DEMO.MARKETING.MARKETING_MCP_SERVER
   TO ROLE WRITER_MARKETING_ROLE;
+
+-- ─────────────────────────────────────────────────────────────────────────────
+-- Writer MCP Connection Info
+-- Copy the output of this query and give it to Writer to configure the
+-- MCP connection. The account identifier and endpoint URL are derived
+-- automatically from the current Snowflake account.
+-- ─────────────────────────────────────────────────────────────────────────────
+SELECT
+  LOWER(CURRENT_ORGANIZATION_NAME()) || '-' || LOWER(CURRENT_ACCOUNT_NAME())
+    AS snowflake_account,
+  'WRITER_SNOW_DEMO.MARKETING.MARKETING_MCP_SERVER'
+    AS mcp_server_name,
+  'https://' || LOWER(CURRENT_ORGANIZATION_NAME()) || '-' || LOWER(CURRENT_ACCOUNT_NAME())
+    || '.snowflakecomputing.com'
+    AS account_url,
+  'WRITER_MARKETING_ROLE'
+    AS role,
+  'WRITER_WH'
+    AS warehouse,
+  'WRITER_OAUTH'
+    AS oauth_integration;
