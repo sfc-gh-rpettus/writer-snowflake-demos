@@ -37,6 +37,7 @@ GRANT ROLE WRITER_MARKETING_ROLE TO USER DEMO_USER;
 GRANT USAGE ON INTEGRATION WRITER_OAUTH TO ROLE WRITER_MARKETING_ROLE;
 
 -- ── Fresh account only: uncomment to create the OAuth integration ──────────
+-- USE ROLE ACCOUNTADMIN;
 -- CREATE SECURITY INTEGRATION IF NOT EXISTS WRITER_OAUTH
 --   TYPE = OAUTH
 --   OAUTH_CLIENT = CUSTOM
@@ -44,11 +45,19 @@ GRANT USAGE ON INTEGRATION WRITER_OAUTH TO ROLE WRITER_MARKETING_ROLE;
 --   OAUTH_REDIRECT_URI = 'https://app.writer.com/mcp/oauth/callback'
 --   OAUTH_ISSUE_REFRESH_TOKENS = TRUE
 --   OAUTH_REFRESH_TOKEN_VALIDITY = 7776000
---   OAUTH_USE_SECONDARY_ROLES = IMPLICIT
---   BLOCKED_ROLES_LIST = ('ACCOUNTADMIN', 'ORGADMIN', 'SECURITYADMIN')
+--   -- OAUTH_USE_SECONDARY_ROLES = IMPLICIT  -- uncomment to allow secondary roles
+--   ALLOWED_ROLES_LIST = ('WRITER_MARKETING_ROLE')
 --   COMMENT = 'OAuth integration for Writer MCP client connection';
--- -- After creation, retrieve the client ID to share with Writer:
+-- -- After creation, retrieve the client ID and secret to share with Writer:
 -- -- SELECT SYSTEM$SHOW_OAUTH_CLIENT_SECRETS('WRITER_OAUTH');
+-- ──────────────────────────────────────────────────────────────────────────
+
+-- ── Important: set the connecting user's default role and warehouse ─────────
+-- The MCP session uses DEFAULT_ROLE — the user must have WRITER_MARKETING_ROLE
+-- as their default or they won't have access to the MCP tools.
+-- Replace DEMO_USER with the actual Snowflake username connecting via Writer.
+-- ALTER USER DEMO_USER SET DEFAULT_ROLE = 'WRITER_MARKETING_ROLE'
+--                          DEFAULT_WAREHOUSE = 'WRITER_WH';
 -- ──────────────────────────────────────────────────────────────────────────
 
 -- ─────────────────────────────────────────────────────────────────────────────

@@ -321,21 +321,22 @@ GRANT USAGE ON MCP SERVER WRITER_SNOW_DEMO.MARKETING.MARKETING_MCP_SERVER
 
 -- ─────────────────────────────────────────────────────────────────────────────
 -- Writer MCP Connection Info
--- Copy the output of this query and give it to Writer to configure the
--- MCP connection. The account identifier and endpoint URL are derived
--- automatically from the current Snowflake account.
+-- Run this query and copy the output to configure Writer's Snowflake integration.
+-- See README.md → "Connecting Writer to Snowflake" for what goes in each field.
 -- ─────────────────────────────────────────────────────────────────────────────
 SELECT
-  LOWER(CURRENT_ORGANIZATION_NAME()) || '-' || LOWER(CURRENT_ACCOUNT_NAME())
-    AS snowflake_account,
-  'WRITER_SNOW_DEMO.MARKETING.MARKETING_MCP_SERVER'
-    AS mcp_server_name,
+  -- Paste into "Tenant URL / MCP Server URL" in Writer's Configure Snowflake UI
   'https://' || LOWER(CURRENT_ORGANIZATION_NAME()) || '-' || LOWER(CURRENT_ACCOUNT_NAME())
     || '.snowflakecomputing.com'
-    AS account_url,
-  'WRITER_MARKETING_ROLE'
-    AS role,
-  'WRITER_WH'
-    AS warehouse,
-  'WRITER_OAUTH'
-    AS oauth_integration;
+    || '/api/v2/databases/WRITER_SNOW_DEMO/schemas/MARKETING/mcp-servers/MARKETING_MCP_SERVER'
+    AS mcp_server_url,
+  -- Supporting info
+  LOWER(CURRENT_ORGANIZATION_NAME()) || '-' || LOWER(CURRENT_ACCOUNT_NAME())
+    AS snowflake_account,
+  'WRITER_MARKETING_ROLE'   AS role,
+  'WRITER_WH'               AS warehouse,
+  'WRITER_OAUTH'            AS oauth_integration;
+
+-- Retrieve OAuth client ID and secret for Writer's Configure Snowflake UI.
+-- The integration name must be UPPERCASE. Store these securely — treat as passwords.
+SELECT SYSTEM$SHOW_OAUTH_CLIENT_SECRETS('WRITER_OAUTH') AS oauth_credentials;
