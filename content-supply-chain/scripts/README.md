@@ -91,24 +91,64 @@ Writer connects to the MCP server via OAuth using the `WRITER_OAUTH` security in
 - Redirect URI is set to `https://app.writer.com/mcp/oauth/callback`
 - `GRANT USAGE ON INTEGRATION WRITER_OAUTH TO ROLE WRITER_MARKETING_ROLE` is in `01_setup_and_foundation.sql`
 
-### What Writer's team needs to configure in Writer
-To connect Writer to the MCP server, provide Writer's team with:
+### Connecting Writer to Snowflake
 
-| Setting | Value |
-|---------|-------|
-| **Snowflake Account** | `<YOUR_SNOWFLAKE_ACCOUNT>` (e.g. `myorg-myaccount`) |
-| **MCP Server Name** | `WRITER_SNOW_DEMO.MARKETING.MARKETING_MCP_SERVER` |
-| **Role** | `WRITER_MARKETING_ROLE` |
-| **OAuth Integration** | `WRITER_OAUTH` — Writer retrieves credentials from this integration |
-| **Warehouse** | `WRITER_WH` |
+When setting up the Snowflake integration in Writer ("Configure Snowflake"), you need three things from your Snowflake account. Run the queries at the end of `04_ai_layer.sql` to get them:
 
-> The OAuth client ID and secret for `WRITER_OAUTH` are managed in Writer's application configuration. Do not include these in any scripts or documentation.
-
-### Verify the OAuth integration is accessible
+**Step 1 — Get the MCP Server URL and account info:**
 ```sql
-USE ROLE WRITER_MARKETING_ROLE;
-SHOW INTEGRATIONS LIKE 'WRITER_OAUTH';  -- should return 1 row
+SELECT
+  'https://' || LOWER(CURRENT_ORGANIZATION_NAME()) || '-' || LOWER(CURRENT_ACCOUNT_NAME())
+    || '.snowflakecomputing.com'
+    || '/api/v2/databases/WRITER_SNOW_DEMO/schemas/MARKETING/mcp-servers/MARKETING_MCP_SERVER'
+    AS mcp_server_url,
+  LOWER(CURRENT_ORGANIZATION_NAME()) || '-' || LOWER(CURRENT_ACCOUNT_NAME()) AS snowflake_account;
 ```
+
+**Step 2 — Get the OAuth client ID and secret:**
+```sql
+-- Integration name must be UPPERCASE
+SELECT SYSTEM$SHOW_OAUTH_CLIENT_SECRETS('WRITER_OAUTH') AS oauth_credentials;
+```
+This returns a JSON object with `OAUTH_CLIENT_ID` and `OAUTH_CLIENT_SECRET`. Treat these as passwords.
+
+**What goes in each Writer field:**
+
+| Writer Field | Value |
+|---|---|
+| **Tenant URL** (MCP Server URL) | Output of Step 1 `mcp_server_url` — full `/api/v2/...` URL |
+| **OAuth 2.0 Client ID** | `OAUTH_CLIENT_ID` from Step 2 JSON |
+| **OAuth 2.0 Client Secret** | `OAUTH_CLIENT_SECRET` from Step 2 JSON |
+
+> **Important:** The MCP session runs as the connecting user's `DEFAULT_ROLE`. Make sure the user authenticating via Writer has `WRITER_MARKETING_ROLE` set as their default role:
+> ```sql
+> ALTER USER <your_username> SET DEFAULT_ROLE = 'WRITER_MARKETING_ROLE'
+>                              DEFAULT_WAREHOUSE = 'WRITER_WH';
+> ```
+
+### OAuth Security Integration (fresh account setup)
+
+If `WRITER_OAUTH` doesn't yet exist, uncomment the `CREATE SECURITY INTEGRATION` block in `01_setup_and_foundation.sql` and run it as ACCOUNTADMIN. Key settings:
+
+- **`ALLOWED_ROLES_LIST = ('WRITER_MARKETING_ROLE')`** — restricts OAuth to only this role
+- **`OAUTH_USE_SECONDARY_ROLES = IMPLICIT`** — optional; include if you want to leverage secondary roles in the OAuth session
+- **`OAUTH_REDIRECT_URI`** — must match exactly what Writer shows during connector setup
+
+### Role access checklist for WRITER_MARKETING_ROLE
+
+| Privilege | Object | Status |
+|-----------|--------|--------|
+| USAGE | MARKETING_MCP_SERVER | ✅ |
+| USAGE | MARKETING_CAMPAIGN_PLANNER (Agent) | ✅ |
+| USAGE | CAMPAIGN_LIBRARY_SEARCH (Cortex Search) | ✅ |
+| USAGE | CAMPAIGN_BRIEFS_SEARCH (Cortex Search) | ✅ |
+| SELECT | CUSTOMER_360_SV (Semantic View) | ✅ |
+| USAGE | ACTIVATE_SEGMENT, SAVE_BRIEF, SAVE_CONTENT_ASSET (Procs) | ✅ |
+| SELECT + INSERT | CAMPAIGN_BRIEFS, CONTENT_ASSETS, CAMPAIGN_AUDIENCES | ✅ |
+| INSERT | CAMPAIGN_EVENTS (needed for flywheel seeding in ACTIVATE_SEGMENT) | ✅ |
+| SELECT | All other tables + Dynamic Tables | ✅ |
+| USAGE | WRITER_WH warehouse | ✅ |
+| USAGE | WRITER_OAUTH integration | ✅ |
 
 ---
 
