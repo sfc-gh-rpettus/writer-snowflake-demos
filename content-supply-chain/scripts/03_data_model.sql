@@ -707,32 +707,47 @@ DECLARE
   v_segment_name  VARCHAR;
   v_staged_count  NUMBER;
   v_result        VARIANT;
+  v_campaign_id   VARCHAR;
+  v_cvr           FLOAT;
+  v_open_rate     FLOAT;
+  v_click_rate    FLOAT;
 BEGIN
-  -- Look up segment name
-  SELECT SEGMENT_NAME INTO :v_segment_name
+  -- Look up segment name and historical conversion rate for seeding
+  SELECT SEGMENT_NAME, AVG_CAMPAIGN_CONVERSION_RATE
+  INTO :v_segment_name, :v_cvr
   FROM WRITER_SNOW_DEMO.MARKETING.MICRO_SEGMENTS
   WHERE SEGMENT_ID = :P_SEGMENT_ID;
 
-  -- Insert customers from the segment, skipping existing pending records for same campaign
+  -- Rates with floor: activewear industry benchmarks (open 28%, click 12%, convert 5%)
+  v_open_rate  := GREATEST(LEAST(:v_cvr * 5.0, 0.65), 0.28);
+  v_click_rate := GREATEST(LEAST(:v_cvr * 2.5, 0.35), 0.12);
+  v_cvr        := GREATEST(:v_cvr, 0.05);
+
+  -- Resolve campaign_id: use content asset's campaign_id if provided,
+  -- otherwise derive a short ID from campaign name (max 15 chars for CAMPAIGN_EVENTS)
+  IF (:P_CAMPAIGN_CONTENT_ID IS NOT NULL) THEN
+    SELECT CAMPAIGN_ID INTO :v_campaign_id
+    FROM WRITER_SNOW_DEMO.MARKETING.CONTENT_ASSETS
+    WHERE ASSET_ID = :P_CAMPAIGN_CONTENT_ID;
+  END IF;
+  IF (:v_campaign_id IS NULL) THEN
+    v_campaign_id := LEFT(REPLACE(UPPER(:P_CAMPAIGN_NAME), ' ', '-'), 15);
+  END IF;
+
+  -- ── Stage customers into CAMPAIGN_AUDIENCES ───────────────────────────────
   INSERT INTO WRITER_SNOW_DEMO.MARKETING.CAMPAIGN_AUDIENCES
     (SEGMENT_ID, SEGMENT_NAME, CUSTOMER_ID, EMAIL, FIRST_NAME, PREFERRED_CHANNEL,
      CAMPAIGN_NAME, CAMPAIGN_CONTENT_ID, PRIORITY_RANK, STATUS, CREATED_AT)
   SELECT
-    :P_SEGMENT_ID,
-    :v_segment_name,
-    c.CUSTOMER_ID,
-    c.EMAIL,
-    c.FIRST_NAME,
-    c.PREFERRED_CHANNEL,
-    :P_CAMPAIGN_NAME,
-    :P_CAMPAIGN_CONTENT_ID,
+    :P_SEGMENT_ID, :v_segment_name,
+    c.CUSTOMER_ID, c.EMAIL, c.FIRST_NAME, c.PREFERRED_CHANNEL,
+    :P_CAMPAIGN_NAME, :P_CAMPAIGN_CONTENT_ID,
     ROW_NUMBER() OVER (ORDER BY c360.CUSTOMER_HEALTH_SCORE DESC),
-    'pending',
-    CURRENT_TIMESTAMP()
+    'pending', CURRENT_TIMESTAMP()
   FROM WRITER_SNOW_DEMO.MARKETING.CUSTOMER_360 c360
   JOIN WRITER_SNOW_DEMO.MARKETING.CUSTOMERS c ON c.CUSTOMER_ID = c360.CUSTOMER_ID
-  WHERE c360.RFM_SEGMENT     = (SELECT RFM_SEGMENT     FROM WRITER_SNOW_DEMO.MARKETING.MICRO_SEGMENTS WHERE SEGMENT_ID = :P_SEGMENT_ID)
-    AND c360.CHURN_RISK_TIER = (SELECT CHURN_RISK_TIER FROM WRITER_SNOW_DEMO.MARKETING.MICRO_SEGMENTS WHERE SEGMENT_ID = :P_SEGMENT_ID)
+  WHERE c360.RFM_SEGMENT      = (SELECT RFM_SEGMENT      FROM WRITER_SNOW_DEMO.MARKETING.MICRO_SEGMENTS WHERE SEGMENT_ID = :P_SEGMENT_ID)
+    AND c360.CHURN_RISK_TIER  = (SELECT CHURN_RISK_TIER  FROM WRITER_SNOW_DEMO.MARKETING.MICRO_SEGMENTS WHERE SEGMENT_ID = :P_SEGMENT_ID)
     AND c360.PREFERRED_CHANNEL = (SELECT PREFERRED_CHANNEL FROM WRITER_SNOW_DEMO.MARKETING.MICRO_SEGMENTS WHERE SEGMENT_ID = :P_SEGMENT_ID)
     AND NOT EXISTS (
       SELECT 1 FROM WRITER_SNOW_DEMO.MARKETING.CAMPAIGN_AUDIENCES ca
@@ -741,19 +756,72 @@ BEGIN
         AND ca.STATUS = 'pending'
     );
 
-  -- Count how many were staged
   SELECT COUNT(*) INTO :v_staged_count
   FROM WRITER_SNOW_DEMO.MARKETING.CAMPAIGN_AUDIENCES
-  WHERE SEGMENT_ID    = :P_SEGMENT_ID
-    AND CAMPAIGN_NAME = :P_CAMPAIGN_NAME
-    AND STATUS        = 'pending';
+  WHERE SEGMENT_ID = :P_SEGMENT_ID AND CAMPAIGN_NAME = :P_CAMPAIGN_NAME AND STATUS = 'pending';
 
-  -- Build and return result JSON
+  -- ── Seed synthetic performance events (simulates Braze/SFMC return data) ──
+  -- This closes the flywheel: activating a segment automatically generates
+  -- realistic send/open/click/convert events that CAMPAIGN_PERFORMANCE_GOLD
+  -- picks up on its next DT refresh.
+  --
+  -- Uses ABS(MOD(HASH(CUSTOMER_ID || salt), 1000)) for true per-row sampling.
+  -- UNIFORM() in WHERE clauses evaluates once per batch (not per row) in procs.
+
+  -- Sends — all staged customers
+  INSERT INTO WRITER_SNOW_DEMO.MARKETING.CAMPAIGN_EVENTS
+    (EVENT_ID, CAMPAIGN_ID, CUSTOMER_ID, EVENT_TYPE, EVENT_TIMESTAMP, CHANNEL, DEVICE_TYPE)
+  SELECT
+    'S' || LEFT(:v_campaign_id, 7) || 'S' || LPAD(ROW_NUMBER() OVER (ORDER BY CUSTOMER_ID), 11, '0'),
+    :v_campaign_id, CUSTOMER_ID, 'send',
+    DATEADD(minute, -ABS(MOD(HASH(CUSTOMER_ID), 1380)) - 60, CURRENT_TIMESTAMP()),
+    PREFERRED_CHANNEL, 'mobile'
+  FROM WRITER_SNOW_DEMO.MARKETING.CAMPAIGN_AUDIENCES
+  WHERE SEGMENT_ID = :P_SEGMENT_ID AND CAMPAIGN_NAME = :P_CAMPAIGN_NAME;
+
+  -- Opens — per-row hash sampling at open_rate
+  INSERT INTO WRITER_SNOW_DEMO.MARKETING.CAMPAIGN_EVENTS
+    (EVENT_ID, CAMPAIGN_ID, CUSTOMER_ID, EVENT_TYPE, EVENT_TIMESTAMP, CHANNEL, DEVICE_TYPE)
+  SELECT
+    'S' || LEFT(:v_campaign_id, 7) || 'O' || LPAD(ROW_NUMBER() OVER (ORDER BY CUSTOMER_ID), 11, '0'),
+    :v_campaign_id, CUSTOMER_ID, 'open',
+    DATEADD(minute, -ABS(MOD(HASH(CUSTOMER_ID || 'O'), 1170)) - 30, CURRENT_TIMESTAMP()),
+    PREFERRED_CHANNEL, 'mobile'
+  FROM WRITER_SNOW_DEMO.MARKETING.CAMPAIGN_AUDIENCES
+  WHERE SEGMENT_ID = :P_SEGMENT_ID AND CAMPAIGN_NAME = :P_CAMPAIGN_NAME
+    AND ABS(MOD(HASH(CUSTOMER_ID || 'open'), 1000)) < :v_open_rate * 1000;
+
+  -- Clicks — per-row hash sampling at click_rate
+  INSERT INTO WRITER_SNOW_DEMO.MARKETING.CAMPAIGN_EVENTS
+    (EVENT_ID, CAMPAIGN_ID, CUSTOMER_ID, EVENT_TYPE, EVENT_TIMESTAMP, CHANNEL, DEVICE_TYPE)
+  SELECT
+    'S' || LEFT(:v_campaign_id, 7) || 'C' || LPAD(ROW_NUMBER() OVER (ORDER BY CUSTOMER_ID), 11, '0'),
+    :v_campaign_id, CUSTOMER_ID, 'click',
+    DATEADD(minute, -ABS(MOD(HASH(CUSTOMER_ID || 'C'), 885)) - 15, CURRENT_TIMESTAMP()),
+    PREFERRED_CHANNEL, 'mobile'
+  FROM WRITER_SNOW_DEMO.MARKETING.CAMPAIGN_AUDIENCES
+  WHERE SEGMENT_ID = :P_SEGMENT_ID AND CAMPAIGN_NAME = :P_CAMPAIGN_NAME
+    AND ABS(MOD(HASH(CUSTOMER_ID || 'click'), 1000)) < :v_click_rate * 1000;
+
+  -- Converts — per-row hash sampling at cvr, with revenue
+  INSERT INTO WRITER_SNOW_DEMO.MARKETING.CAMPAIGN_EVENTS
+    (EVENT_ID, CAMPAIGN_ID, CUSTOMER_ID, EVENT_TYPE, EVENT_TIMESTAMP, CHANNEL, DEVICE_TYPE, REVENUE)
+  SELECT
+    'S' || LEFT(:v_campaign_id, 7) || 'V' || LPAD(ROW_NUMBER() OVER (ORDER BY CUSTOMER_ID), 11, '0'),
+    :v_campaign_id, CUSTOMER_ID, 'convert',
+    DATEADD(minute, -ABS(MOD(HASH(CUSTOMER_ID || 'V'), 595)) - 5, CURRENT_TIMESTAMP()),
+    PREFERRED_CHANNEL, 'mobile',
+    ROUND(35.0 + ABS(MOD(HASH(CUSTOMER_ID), 245)), 2)
+  FROM WRITER_SNOW_DEMO.MARKETING.CAMPAIGN_AUDIENCES
+  WHERE SEGMENT_ID = :P_SEGMENT_ID AND CAMPAIGN_NAME = :P_CAMPAIGN_NAME
+    AND ABS(MOD(HASH(CUSTOMER_ID || 'convert'), 1000)) < :v_cvr * 1000;
+
   v_result := OBJECT_CONSTRUCT(
     'customers_staged', :v_staged_count,
     'segment_id',       :P_SEGMENT_ID,
     'segment_name',     :v_segment_name,
     'campaign_name',    :P_CAMPAIGN_NAME,
+    'campaign_id',      :v_campaign_id,
     'status',           'success'
   );
   RETURN :v_result;
