@@ -1,6 +1,6 @@
 # Apex Athletics — Content Supply Chain Demo Setup
 
-**Schema:** `WRITER_SNOW_DEMO.MARKETING` | **Account:** demo490 | **Build role:** SYSADMIN  
+**Schema:** `WRITER_SNOW_DEMO.MARKETING` | **Build role:** SYSADMIN  
 **Demo role:** `WRITER_MARKETING_ROLE` | **OAuth integration:** `WRITER_OAUTH`
 
 ---
@@ -36,15 +36,14 @@ SELECT SNOWFLAKE.CORTEX.COMPLETE('claude-haiku-4-5', 'ping') AS test;
 
 ```bash
 cd scripts/
-./run_all.sh demo490
+./run_all.sh <your-connection>
 ```
 
-To skip Phase 2 objects (saves 10–20 min, not needed for Phase 1 demo):
+To skip Phase 2 objects (not needed for Phase 1 demo):
 ```bash
-SKIP_PHASE2=1 ./run_all.sh demo490
+SKIP_PHASE2=1 ./run_all.sh <your-connection>
 ```
 
-**Expected total runtime:** ~25–35 min with SKIP_PHASE2=1, ~45–60 min full.
 
 ---
 
@@ -52,14 +51,14 @@ SKIP_PHASE2=1 ./run_all.sh demo490
 
 Open each script in a Snowsight worksheet and run in order. Use **Run All** (⌘+Shift+Enter).
 
-| Step | Script | Est. Time | Notes |
-|------|--------|-----------|-------|
-| 1 | `01_setup_and_foundation.sql` | <2 min | ⚠️ See "Fresh Account" note below. Includes env + all reference tables. |
-| 2 | `02_bronze_data.sql` | 5–10 min | Generates 50K customers, 2.2M events — recommend MEDIUM+ warehouse |
-| 3 | `03_data_model.sql` | 5–8 min | DTs + AI-generated campaign library (300 CORTEX.COMPLETE calls) + write-back tables + procs |
-| 4 | `04_ai_layer.sql` | <3 min | Cortex Search + Semantic View + Agent + MCP Server. Wait 1–5 min after for Search indexing. |
-| 5 | `05_analytics_and_grants.sql` | <2 min | Performance analytics DT + final grant sweep |
-| 6 | `06_phase2_optional.sql` | 10–20 min | **Optional** — not needed for Phase 1 demo |
+| Step | Script | Notes |
+|------|--------|-------|
+| 1 | `01_setup_and_foundation.sql` | ⚠️ See "Fresh Account" note below. Includes env + all reference tables. |
+| 2 | `02_bronze_data.sql` | Generates 50K customers, 2.2M events — recommend MEDIUM+ warehouse |
+| 3 | `03_data_model.sql` | DTs + AI-generated campaign library (CORTEX.COMPLETE calls) + write-back tables + procs |
+| 4 | `04_ai_layer.sql` | Cortex Search + Semantic View + Agent + MCP Server. Allow time for Search indexing after. |
+| 5 | `05_analytics_and_grants.sql` | Performance analytics DT + final grant sweep |
+| 6 | `06_phase2_optional.sql` | **Optional** — not needed for Phase 1 demo |
 
 ---
 
@@ -157,7 +156,7 @@ If `WRITER_OAUTH` doesn't yet exist, uncomment the `CREATE SECURITY INTEGRATION`
 To wipe all demo objects and start fresh:
 
 ```bash
-snow sql -f 99_teardown.sql -c demo490
+snow sql -f 99_teardown.sql -c <your-connection>
 ```
 
 This drops `WRITER_SNOW_DEMO.MARKETING` schema and `WRITER_MARKETING_ROLE`. It does **not** touch other schemas or databases.
@@ -189,7 +188,7 @@ SHOW AGENTS IN SCHEMA WRITER_SNOW_DEMO.MARKETING;  -- MARKETING_CAMPAIGN_PLANNER
 ## Before Each Demo
 
 ```bash
-snow sql -f 99_demo_reset.sql -c demo490
+snow sql -f 99_demo_reset.sql -c <your-connection>
 ```
 
 ---

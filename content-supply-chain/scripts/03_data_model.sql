@@ -1,6 +1,6 @@
 -- =============================================================================
 -- 03_data_model.sql  —  Apex Athletics Content Supply Chain
--- Step 3 of 6 — Run time: 5–8 min (includes 300 CORTEX.COMPLETE calls)
+-- Step 3 of 6
 --
 -- Creates:
 --   • CUSTOMER_360 Dynamic Table (65 cols, 1-day lag, FULL refresh)

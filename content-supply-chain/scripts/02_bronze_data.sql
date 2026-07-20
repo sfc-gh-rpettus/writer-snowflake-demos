@@ -1,6 +1,6 @@
 -- =============================================================================
 -- 02_bronze_data.sql  —  Apex Athletics Content Supply Chain
--- Step 2 of 6 — Run time: 5–10 min (recommend MEDIUM+ warehouse)
+-- Step 2 of 6
 --
 -- Generates: CUSTOMERS (50K), EVENT_STREAM (~2.2M), CAMPAIGN_EVENTS (156K)
 -- Pure SQL using TABLE(GENERATOR()) — no Python required.

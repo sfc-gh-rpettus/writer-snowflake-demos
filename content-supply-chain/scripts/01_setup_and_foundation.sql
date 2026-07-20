@@ -1,6 +1,6 @@
 -- =============================================================================
 -- 01_setup_and_foundation.sql  —  Apex Athletics Content Supply Chain
--- Step 1 of 6 — Run time: <2 min
+-- Step 1 of 6
 --
 -- Creates: WRITER_SNOW_DEMO database, WRITER_SNOW_DEMO.MARKETING schema,
 --          WRITER_WH warehouse, WRITER_MARKETING_ROLE,

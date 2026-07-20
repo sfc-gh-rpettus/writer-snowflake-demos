@@ -64,7 +64,7 @@ writer-snowflake-demos/
         ├── README.md                      ← Demo-specific setup guide
         ├── run_all.sh                     ← One-command setup
         ├── 01_setup_and_foundation.sql    ← Database, schema, role, reference tables
-        ├── 02_bronze_data.sql             ← 50K customers, 2.2M events (5–10 min)
+        ├── 02_bronze_data.sql             ← 50K customers, 2.2M events
         ├── 03_data_model.sql              ← DTs, campaign library, write-back tables, procs
         ├── 04_ai_layer.sql                ← Cortex Search, Semantic View, Agent, MCP Server
         ├── 05_analytics_and_grants.sql    ← Performance DT + final grants

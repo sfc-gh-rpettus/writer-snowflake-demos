@@ -1,6 +1,6 @@
 -- =============================================================================
 -- 04_ai_layer.sql  —  Apex Athletics Content Supply Chain
--- Step 4 of 6 — Run time: <3 min
+-- Step 4 of 6
 --
 -- Creates:
 --   • CAMPAIGN_LIBRARY_SEARCH Cortex Search service

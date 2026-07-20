@@ -1,6 +1,6 @@
 -- =============================================================================
 -- 05_analytics_and_grants.sql  —  Apex Athletics Content Supply Chain
--- Step 5 of 6 — Run time: <2 min
+-- Step 5 of 6
 --
 -- Creates:
 --   • PAID_MEDIA_PERFORMANCE table (18K synthetic ad platform rows)

@@ -1,6 +1,6 @@
 -- =============================================================================
 -- 06_phase2_optional.sql  —  Apex Athletics Content Supply Chain
--- Step 6 of 6 — OPTIONAL — Run time: 10–20 min
+-- Step 6 of 6 — OPTIONAL
 --
 -- NOT required for the Phase 1 demo walkthrough.
 -- Creates Phase 2 objects for follow-up conversations:

@@ -10,11 +10,11 @@
 #
 # Usage:
 #   chmod +x run_all.sh
-#   ./run_all.sh demo490          # use named connection
+#   ./run_all.sh <your-connection>   # use named connection
 #   ./run_all.sh                  # uses SNOW_DEFAULT_CONNECTION env var
 #
-# Skip Phase 2 (saves ~20 min — not needed for Phase 1 demo):
-#   SKIP_PHASE2=1 ./run_all.sh demo490
+# Skip Phase 2 (not needed for Phase 1 demo):
+#   SKIP_PHASE2=1 ./run_all.sh <your-connection>
 # =============================================================================
 
 set -e
@@ -75,7 +75,7 @@ run_script "01_setup_and_foundation.sql" \
   "Environment + reference tables" "30 sec"
 
 # ── Step 2 ────────────────────────────────────────────────────────────────────
-warn "This generates 2.2M rows — may take 5–10 min on a MEDIUM warehouse."
+warn "This generates 2.2M rows. Recommend MEDIUM+ warehouse."
 
 run_script "02_bronze_data.sql" \
   "Bronze data (50K customers / 2.2M events)" "5-10 min"
@@ -104,8 +104,8 @@ if [ "$SKIP_PHASE2" = "1" ]; then
   warn "To run later: snow sql -f 06_phase2_optional.sql -c $CONNECTION"
 else
   header "Step 6 — Phase 2 Objects (OPTIONAL)"
-  warn "CORTEX.SENTIMENT on ~120K rows — may take 10–20 min."
-  warn "Skip with: SKIP_PHASE2=1 ./run_all.sh $CONNECTION"
+  warn "CORTEX.SENTIMENT on ~120K rows — may be slow. Consider a larger warehouse."
+  warn "Skip with: SKIP_PHASE2=1 ./run_all.sh \$CONNECTION"
   echo ""
   run_script "06_phase2_optional.sql" \
     "Phase 2: sentiment, GEO, brand voice" "10-20 min"
@@ -118,7 +118,7 @@ echo -e "║  Setup complete!                         ║"
 echo -e "╚══════════════════════════════════════════╝${RESET}"
 echo ""
 echo "Next steps:"
-echo "  1. Wait ~5 min for Cortex Search to finish indexing"
+echo "  1. Allow time for Cortex Search to finish indexing before testing"
 echo "  2. Grant OAuth integration (if needed):"
 echo "     snow sql -c $CONNECTION -q \"GRANT USAGE ON INTEGRATION WRITER_OAUTH TO ROLE WRITER_MARKETING_ROLE\""
 echo "  3. Before each demo: snow sql -f 99_demo_reset.sql -c $CONNECTION"
