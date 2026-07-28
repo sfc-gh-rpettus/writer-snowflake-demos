@@ -320,6 +320,169 @@ GRANT USAGE ON MCP SERVER WRITER_SNOW_DEMO.MARKETING.MARKETING_MCP_SERVER
   TO ROLE WRITER_MARKETING_ROLE;
 
 -- ─────────────────────────────────────────────────────────────────────────────
+-- MARKETING_MCP_SERVER (direct-tool variant)
+-- This intentionally overwrites the agent-based server above. Use this block
+-- if you want Writer to call the Cortex Analyst semantic view and Cortex Search
+-- service directly as MCP tools, without routing through the Cortex Agent.
+--
+-- To use the agent-based version instead, comment out this block.
+--
+-- Tool surface:
+--   customer-analyst     CORTEX_ANALYST_MESSAGE      CUSTOMER_360_SV semantic view
+--   campaign-search      CORTEX_SEARCH_SERVICE_QUERY CAMPAIGN_LIBRARY_SEARCH
+--   save-brief           GENERIC procedure           SAVE_BRIEF
+--   save-asset           GENERIC procedure           SAVE_CONTENT_ASSET
+--   activate-segment     GENERIC procedure           ACTIVATE_SEGMENT
+--   sql-exec             SYSTEM_EXECUTE_SQL          read-only ad-hoc SQL
+-- ─────────────────────────────────────────────────────────────────────────────
+CREATE OR REPLACE MCP SERVER WRITER_SNOW_DEMO.MARKETING.MARKETING_MCP_SERVER
+  FROM SPECIFICATION $$
+    tools:
+
+      -- Cortex Analyst: natural language to SQL against the CUSTOMER_360_SV
+      -- semantic view. Covers CUSTOMER_360 (50K customers with RFM segment,
+      -- churn risk tier, LTV, engagement score, health score, preferred channel,
+      -- top product category, loyalty tier, purchase/event/email metrics) joined
+      -- to MICRO_SEGMENTS (22 segments with intent score, revenue opportunity,
+      -- avg conversion rate). Use for: segment rankings, LTV analysis, churn risk
+      -- breakdowns, customer counts by tier/channel/RFM, revenue opportunity calcs.
+      - name: "customer-analyst"
+        type: "CORTEX_ANALYST_MESSAGE"
+        identifier: "WRITER_SNOW_DEMO.MARKETING.CUSTOMER_360_SV"
+        title: "Customer & Segment Analyst"
+        description: >
+          Query Apex Athletics customer and segment intelligence using natural
+          language. Ask about micro-segment rankings by intent score, LTV, or
+          churn risk; customer counts by RFM tier, loyalty tier, or preferred
+          channel; revenue opportunity by segment; engagement and conversion
+          rates; and any metric available in the Customer 360 or Micro-Segments
+          data. Returns SQL-backed answers grounded in live Snowflake data.
+
+      -- Cortex Search: semantic retrieval over CAMPAIGN_LIBRARY (100 historical
+      -- Apex Athletics campaigns). Each record contains campaign name, target
+      -- segment, channel mix, objective, subject lines, CTAs, open rate, click
+      -- rate, conversion rate, and revenue generated. Use for: finding past
+      -- campaigns by segment type or channel, retrieving top-performing subject
+      -- lines and CTAs, identifying what has worked for specific audience tiers.
+      - name: "campaign-search"
+        type: "CORTEX_SEARCH_SERVICE_QUERY"
+        identifier: "WRITER_SNOW_DEMO.MARKETING.CAMPAIGN_LIBRARY_SEARCH"
+        title: "Campaign Library Search"
+        description: >
+          Search the Apex Athletics historical campaign library for past campaign
+          performance. Use for: finding campaigns that targeted specific segments
+          (e.g., Champion, At Risk, Dormant), retrieving open rates, click rates,
+          and conversion rates by channel, looking up subject lines and CTAs that
+          drove high engagement, and identifying top-performing campaign formats
+          for email, SMS, push, and social channels.
+
+      -- Write-back: save a campaign brief authored by Writer into Snowflake.
+      -- Returns BRIEF_ID. Required params: P_CAMPAIGN_ID (VARCHAR), P_BRIEF_JSON
+      -- (VARIANT with fields: audience_segment_id, persona_name, objective,
+      -- target_audience_description, key_messages, tone, channels, primary_kpi,
+      -- kpi_target, mandatory_inclusions, prohibited_content, product_focus,
+      -- inspiration_campaign_ids, brand_voice_notes, status, created_by).
+      - name: "save-brief"
+        type: "GENERIC"
+        identifier: "WRITER_SNOW_DEMO.MARKETING.SAVE_BRIEF"
+        title: "Save Campaign Brief"
+        description: >
+          Store a campaign brief that Writer has authored back into Snowflake.
+          Writer calls this after generating a brief in its own application.
+          Returns the BRIEF_ID for the stored brief.
+        config:
+          type: "procedure"
+          warehouse: "WRITER_WH"
+          input_schema:
+            type: "object"
+            properties:
+              P_CAMPAIGN_ID:
+                type: "string"
+                description: "Campaign ID in CMP-YYYY-NNN format (e.g., CMP-2025-001)"
+              P_BRIEF_JSON:
+                type: "object"
+                description: >
+                  Brief content as a JSON object with fields: audience_segment_id,
+                  persona_name, objective, target_audience_description, key_messages,
+                  tone, channels, primary_kpi, kpi_target, mandatory_inclusions,
+                  prohibited_content, brand_voice_notes, created_by
+            required: ["P_CAMPAIGN_ID", "P_BRIEF_JSON"]
+
+      -- Write-back: save a single content asset generated by Writer into Snowflake.
+      -- Returns ASSET_ID. Requires P_BRIEF_ID from a prior save-brief call.
+      -- Required params: P_BRIEF_ID (VARCHAR), P_ASSET_JSON (VARIANT with fields:
+      -- campaign_id, channel (email/sms/push/social/web), asset_type
+      -- (subject_line/email_body/social_post/sms_message/push_notification/
+      -- landing_page), content_body, headline, cta, approval_status,
+      -- brand_voice_score).
+      - name: "save-asset"
+        type: "GENERIC"
+        identifier: "WRITER_SNOW_DEMO.MARKETING.SAVE_CONTENT_ASSET"
+        title: "Save Content Asset"
+        description: >
+          Store a single content asset (email, social post, SMS, push notification,
+          etc.) that Writer has generated back into Snowflake. Writer calls this
+          for each asset it creates. Returns the ASSET_ID for the stored asset.
+        config:
+          type: "procedure"
+          warehouse: "WRITER_WH"
+          input_schema:
+            type: "object"
+            properties:
+              P_BRIEF_ID:
+                type: "string"
+                description: "Brief ID this asset belongs to (returned by save-brief)"
+              P_ASSET_JSON:
+                type: "object"
+                description: >
+                  Asset content as a JSON object with fields: campaign_id, channel
+                  (email/sms/push/social/web), asset_type (subject_line/email_body/
+                  social_post/sms_message/push_notification/landing_page), content_body,
+                  headline, cta, approval_status, brand_voice_score
+            required: ["P_BRIEF_ID", "P_ASSET_JSON"]
+
+      -- Write-back: stage all customers from a micro-segment into CAMPAIGN_AUDIENCES
+      -- for Reverse ETL delivery. Also seeds synthetic campaign performance events
+      -- (send/open/click/convert) into CAMPAIGN_EVENTS to close the flywheel.
+      -- Idempotent. Returns JSON: customers_staged, segment_name, campaign_id, status.
+      - name: "activate-segment"
+        type: "GENERIC"
+        identifier: "WRITER_SNOW_DEMO.MARKETING.ACTIVATE_SEGMENT"
+        title: "Activate Segment"
+        description: >
+          Stage all customers from a micro-segment into the CAMPAIGN_AUDIENCES table
+          for Reverse ETL delivery to Braze/SFMC. Idempotent — safe to call multiple
+          times. Returns a JSON with customers_staged, segment_name, and status.
+        config:
+          type: "procedure"
+          warehouse: "WRITER_WH"
+          input_schema:
+            type: "object"
+            properties:
+              P_SEGMENT_ID:
+                type: "number"
+                description: "Segment ID from MICRO_SEGMENTS table (1-22)"
+              P_CAMPAIGN_NAME:
+                type: "string"
+                description: "Name of the campaign being activated (e.g., 'Welcome Series Q3')"
+              P_CAMPAIGN_CONTENT_ID:
+                type: "string"
+                description: "Optional: ASSET_ID from CONTENT_ASSETS to link this activation to a specific asset"
+            required: ["P_SEGMENT_ID", "P_CAMPAIGN_NAME"]
+
+      - name: "sql-exec"
+        type: "SYSTEM_EXECUTE_SQL"
+        title: "Execute SQL"
+        description: >
+          Execute read-only SQL queries against the WRITER_SNOW_DEMO.MARKETING schema.
+          Use for ad-hoc analytics: customer lookups, segment queries, campaign
+          performance analysis, or any data exploration not covered by other tools.
+  $$;
+
+GRANT USAGE ON MCP SERVER WRITER_SNOW_DEMO.MARKETING.MARKETING_MCP_SERVER
+  TO ROLE WRITER_MARKETING_ROLE;
+
+-- ─────────────────────────────────────────────────────────────────────────────
 -- Writer MCP Connection Info
 -- Run this query and copy the output to configure Writer's Snowflake integration.
 -- See README.md → "Connecting Writer to Snowflake" for what goes in each field.
