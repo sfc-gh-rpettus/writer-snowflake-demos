@@ -152,11 +152,11 @@ CREATE OR REPLACE AGENT WRITER_SNOW_DEMO.MARKETING.MARKETING_CAMPAIGN_PLANNER
   FROM SPECIFICATION
   $$
   models:
-    orchestration: claude-sonnet-4-6
+    orchestration: auto
 
   orchestration:
     budget:
-      seconds: 60
+      seconds: 600
       tokens: 32000
 
   instructions:
