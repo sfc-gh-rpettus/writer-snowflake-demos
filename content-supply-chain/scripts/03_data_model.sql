@@ -616,26 +616,13 @@ GRANT SELECT ON TABLE WRITER_SNOW_DEMO.MARKETING.CAMPAIGN_LIBRARY TO ROLE WRITER
 -- WRITE-BACK TABLES  (from 06_content_tables.sql)
 -- ──────────────────────────────────────────────────────────────────────────
 CREATE OR REPLACE TABLE WRITER_SNOW_DEMO.MARKETING.CAMPAIGN_BRIEFS (
-  BRIEF_ID                    VARCHAR(30)   NOT NULL,
-  CAMPAIGN_ID                 VARCHAR(15),
-  AUDIENCE_SEGMENT_ID         VARCHAR(10),
-  PERSONA_NAME                VARCHAR(100),
-  OBJECTIVE                   VARCHAR(30),   -- awareness/consideration/conversion/retention
-  TARGET_AUDIENCE_DESCRIPTION VARCHAR(500),
-  KEY_MESSAGES                ARRAY,
-  TONE                        VARCHAR(50),
-  CHANNELS                    ARRAY,
-  PRIMARY_KPI                 VARCHAR(50),
-  KPI_TARGET                  VARCHAR(50),
-  MANDATORY_INCLUSIONS        VARCHAR(300),
-  PROHIBITED_CONTENT          VARCHAR(300),
-  PRODUCT_FOCUS               VARCHAR(10),
-  INSPIRATION_CAMPAIGN_IDS    ARRAY,
-  BRAND_VOICE_NOTES           VARCHAR(500),
-  STATUS                      VARCHAR(20)   DEFAULT 'draft',  -- draft/approved/archived
-  CREATED_BY                  VARCHAR(50),
-  CREATED_AT                  TIMESTAMP_NTZ DEFAULT CURRENT_TIMESTAMP(),
-  APPROVED_AT                 TIMESTAMP_NTZ
+  BRIEF_ID      VARCHAR(50)    NOT NULL,
+  CAMPAIGN_ID   VARCHAR(30),
+  STATUS        VARCHAR(20)    DEFAULT 'draft',  -- draft/approved/archived
+  CREATED_BY    VARCHAR(100),
+  CREATED_AT    TIMESTAMP_NTZ  DEFAULT CURRENT_TIMESTAMP(),
+  APPROVED_AT   TIMESTAMP_NTZ,
+  BRIEF_CONTENT VARIANT        -- full brief JSON from Writer
 );
 
 -- Write-back table: Writer needs SELECT + INSERT
@@ -856,52 +843,24 @@ BEGIN
     'BRF-' || REPLACE(P_CAMPAIGN_ID, 'CMP-', '') || '-' || TO_CHAR(CURRENT_TIMESTAMP(), 'HH24MISS')
   );
 
-  -- Upsert brief
+  -- Upsert brief: structured metadata + full VARIANT content
   MERGE INTO WRITER_SNOW_DEMO.MARKETING.CAMPAIGN_BRIEFS tgt
   USING (SELECT :v_brief_id AS BRIEF_ID) src
   ON (tgt.BRIEF_ID = src.BRIEF_ID)
   WHEN MATCHED THEN UPDATE SET
-    CAMPAIGN_ID                 = :P_CAMPAIGN_ID,
-    AUDIENCE_SEGMENT_ID         = :P_BRIEF_JSON:audience_segment_id::VARCHAR,
-    PERSONA_NAME                = :P_BRIEF_JSON:persona_name::VARCHAR,
-    OBJECTIVE                   = :P_BRIEF_JSON:objective::VARCHAR,
-    TARGET_AUDIENCE_DESCRIPTION = :P_BRIEF_JSON:target_audience_description::VARCHAR,
-    KEY_MESSAGES                = :P_BRIEF_JSON:key_messages::ARRAY,
-    TONE                        = :P_BRIEF_JSON:tone::VARCHAR,
-    CHANNELS                    = :P_BRIEF_JSON:channels::ARRAY,
-    PRIMARY_KPI                 = :P_BRIEF_JSON:primary_kpi::VARCHAR,
-    KPI_TARGET                  = :P_BRIEF_JSON:kpi_target::VARCHAR,
-    MANDATORY_INCLUSIONS        = :P_BRIEF_JSON:mandatory_inclusions::VARCHAR,
-    PROHIBITED_CONTENT          = :P_BRIEF_JSON:prohibited_content::VARCHAR,
-    PRODUCT_FOCUS               = :P_BRIEF_JSON:product_focus::VARCHAR,
-    INSPIRATION_CAMPAIGN_IDS    = :P_BRIEF_JSON:inspiration_campaign_ids::ARRAY,
-    BRAND_VOICE_NOTES           = :P_BRIEF_JSON:brand_voice_notes::VARCHAR,
-    STATUS                      = COALESCE(:P_BRIEF_JSON:status::VARCHAR, 'draft'),
-    CREATED_BY                  = :P_BRIEF_JSON:created_by::VARCHAR
+    CAMPAIGN_ID   = :P_CAMPAIGN_ID,
+    STATUS        = COALESCE(:P_BRIEF_JSON:status::VARCHAR, 'draft'),
+    CREATED_BY    = :P_BRIEF_JSON:created_by::VARCHAR,
+    BRIEF_CONTENT = :P_BRIEF_JSON
   WHEN NOT MATCHED THEN INSERT (
-    BRIEF_ID, CAMPAIGN_ID, AUDIENCE_SEGMENT_ID, PERSONA_NAME, OBJECTIVE,
-    TARGET_AUDIENCE_DESCRIPTION, KEY_MESSAGES, TONE, CHANNELS, PRIMARY_KPI,
-    KPI_TARGET, MANDATORY_INCLUSIONS, PROHIBITED_CONTENT, PRODUCT_FOCUS,
-    INSPIRATION_CAMPAIGN_IDS, BRAND_VOICE_NOTES, STATUS, CREATED_BY, CREATED_AT
+    BRIEF_ID, CAMPAIGN_ID, STATUS, CREATED_BY, CREATED_AT, BRIEF_CONTENT
   ) VALUES (
-    :v_brief_id, :P_CAMPAIGN_ID,
-    :P_BRIEF_JSON:audience_segment_id::VARCHAR,
-    :P_BRIEF_JSON:persona_name::VARCHAR,
-    :P_BRIEF_JSON:objective::VARCHAR,
-    :P_BRIEF_JSON:target_audience_description::VARCHAR,
-    :P_BRIEF_JSON:key_messages::ARRAY,
-    :P_BRIEF_JSON:tone::VARCHAR,
-    :P_BRIEF_JSON:channels::ARRAY,
-    :P_BRIEF_JSON:primary_kpi::VARCHAR,
-    :P_BRIEF_JSON:kpi_target::VARCHAR,
-    :P_BRIEF_JSON:mandatory_inclusions::VARCHAR,
-    :P_BRIEF_JSON:prohibited_content::VARCHAR,
-    :P_BRIEF_JSON:product_focus::VARCHAR,
-    :P_BRIEF_JSON:inspiration_campaign_ids::ARRAY,
-    :P_BRIEF_JSON:brand_voice_notes::VARCHAR,
+    :v_brief_id,
+    :P_CAMPAIGN_ID,
     COALESCE(:P_BRIEF_JSON:status::VARCHAR, 'draft'),
     :P_BRIEF_JSON:created_by::VARCHAR,
-    CURRENT_TIMESTAMP()
+    CURRENT_TIMESTAMP(),
+    :P_BRIEF_JSON
   );
 
   RETURN :v_brief_id;
