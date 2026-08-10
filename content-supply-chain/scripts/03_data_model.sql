@@ -822,12 +822,13 @@ GRANT USAGE ON PROCEDURE WRITER_SNOW_DEMO.MARKETING.ACTIVATE_SEGMENT(NUMBER, VAR
 -- SAVE_BRIEF
 -- Writer calls this via MCP after authoring a campaign brief.
 -- Upserts into CAMPAIGN_BRIEFS; returns the BRIEF_ID.
--- Signature: (P_CAMPAIGN_ID VARCHAR, P_BRIEF_JSON VARIANT)
+-- Signature: (P_CAMPAIGN_ID VARCHAR, P_BRIEF_JSON VARCHAR)
+-- P_BRIEF_JSON is a JSON string — PARSE_JSON() is applied internally.
 -- Returns: BRIEF_ID string
 -- ---------------------------------------------------------------------------
 CREATE OR REPLACE PROCEDURE WRITER_SNOW_DEMO.MARKETING.SAVE_BRIEF(
   P_CAMPAIGN_ID VARCHAR,
-  P_BRIEF_JSON  VARIANT
+  P_BRIEF_JSON  VARCHAR
 )
 RETURNS VARCHAR
 LANGUAGE SQL
@@ -835,12 +836,15 @@ EXECUTE AS CALLER
 AS
 $$
 DECLARE
-  v_brief_id VARCHAR;
+  v_brief_id   VARCHAR;
+  v_brief_obj  VARIANT;
 BEGIN
+  v_brief_obj := PARSE_JSON(:P_BRIEF_JSON);
+
   -- Generate BRIEF_ID if not provided
   v_brief_id := COALESCE(
-    P_BRIEF_JSON:brief_id::VARCHAR,
-    'BRF-' || REPLACE(P_CAMPAIGN_ID, 'CMP-', '') || '-' || TO_CHAR(CURRENT_TIMESTAMP(), 'HH24MISS')
+    v_brief_obj:brief_id::VARCHAR,
+    'BRF-' || REPLACE(:P_CAMPAIGN_ID, 'CMP-', '') || '-' || TO_CHAR(CURRENT_TIMESTAMP(), 'HH24MISS')
   );
 
   -- Upsert brief: structured metadata + full VARIANT content
@@ -849,37 +853,38 @@ BEGIN
   ON (tgt.BRIEF_ID = src.BRIEF_ID)
   WHEN MATCHED THEN UPDATE SET
     CAMPAIGN_ID   = :P_CAMPAIGN_ID,
-    STATUS        = COALESCE(:P_BRIEF_JSON:status::VARCHAR, 'draft'),
-    CREATED_BY    = :P_BRIEF_JSON:created_by::VARCHAR,
-    BRIEF_CONTENT = :P_BRIEF_JSON
+    STATUS        = COALESCE(:v_brief_obj:status::VARCHAR, 'draft'),
+    CREATED_BY    = :v_brief_obj:created_by::VARCHAR,
+    BRIEF_CONTENT = :v_brief_obj
   WHEN NOT MATCHED THEN INSERT (
     BRIEF_ID, CAMPAIGN_ID, STATUS, CREATED_BY, CREATED_AT, BRIEF_CONTENT
   ) VALUES (
     :v_brief_id,
     :P_CAMPAIGN_ID,
-    COALESCE(:P_BRIEF_JSON:status::VARCHAR, 'draft'),
-    :P_BRIEF_JSON:created_by::VARCHAR,
+    COALESCE(:v_brief_obj:status::VARCHAR, 'draft'),
+    :v_brief_obj:created_by::VARCHAR,
     CURRENT_TIMESTAMP(),
-    :P_BRIEF_JSON
+    :v_brief_obj
   );
 
   RETURN :v_brief_id;
 END;
 $$;
 
-GRANT USAGE ON PROCEDURE WRITER_SNOW_DEMO.MARKETING.SAVE_BRIEF(VARCHAR, VARIANT)
+GRANT USAGE ON PROCEDURE WRITER_SNOW_DEMO.MARKETING.SAVE_BRIEF(VARCHAR, VARCHAR)
   TO ROLE WRITER_MARKETING_ROLE;
 
 -- ---------------------------------------------------------------------------
 -- SAVE_CONTENT_ASSET
 -- Writer calls this via MCP after generating each content asset.
 -- Inserts into CONTENT_ASSETS; returns the ASSET_ID.
--- Signature: (P_BRIEF_ID VARCHAR, P_ASSET_JSON VARIANT)
+-- Signature: (P_BRIEF_ID VARCHAR, P_ASSET_JSON VARCHAR)
+-- P_ASSET_JSON is a JSON string — PARSE_JSON() is applied internally.
 -- Returns: ASSET_ID string
 -- ---------------------------------------------------------------------------
 CREATE OR REPLACE PROCEDURE WRITER_SNOW_DEMO.MARKETING.SAVE_CONTENT_ASSET(
   P_BRIEF_ID   VARCHAR,
-  P_ASSET_JSON VARIANT
+  P_ASSET_JSON VARCHAR
 )
 RETURNS VARCHAR
 LANGUAGE SQL
@@ -887,18 +892,21 @@ EXECUTE AS CALLER
 AS
 $$
 DECLARE
-  v_asset_id VARCHAR;
+  v_asset_id  VARCHAR;
+  v_asset_obj VARIANT;
 BEGIN
+  v_asset_obj := PARSE_JSON(:P_ASSET_JSON);
+
   -- Generate ASSET_ID from brief_id + channel + timestamp
   v_asset_id := COALESCE(
-    :P_ASSET_JSON:asset_id::VARCHAR,
+    v_asset_obj:asset_id::VARCHAR,
     'AST-' || REPLACE(:P_BRIEF_ID, 'BRF-', '') || '-' ||
-      UPPER(LEFT(:P_ASSET_JSON:channel::VARCHAR, 3)) || '-' ||
+      UPPER(LEFT(v_asset_obj:channel::VARCHAR, 3)) || '-' ||
       TO_CHAR(CURRENT_TIMESTAMP(), 'HHMMSS')
   );
 
   -- Use INSERT ... SELECT to allow VARIANT path accessor in column list
-  -- (VALUES clause does not support :P_ASSET_JSON:key::TYPE syntax)
+  -- (VALUES clause does not support :v_asset_obj:key::TYPE syntax)
   INSERT INTO WRITER_SNOW_DEMO.MARKETING.CONTENT_ASSETS (
     ASSET_ID, BRIEF_ID, CAMPAIGN_ID, CHANNEL, ASSET_TYPE, CONTENT_BODY,
     HEADLINE, CTA, APPROVAL_STATUS, BRAND_VOICE_SCORE, GENERATED_AT
@@ -906,19 +914,19 @@ BEGIN
   SELECT
     :v_asset_id,
     :P_BRIEF_ID,
-    :P_ASSET_JSON:campaign_id::VARCHAR,
-    :P_ASSET_JSON:channel::VARCHAR,
-    :P_ASSET_JSON:asset_type::VARCHAR,
-    :P_ASSET_JSON:content_body::VARCHAR,
-    :P_ASSET_JSON:headline::VARCHAR,
-    :P_ASSET_JSON:cta::VARCHAR,
-    COALESCE(:P_ASSET_JSON:approval_status::VARCHAR, 'draft'),
-    :P_ASSET_JSON:brand_voice_score::NUMBER,
+    :v_asset_obj:campaign_id::VARCHAR,
+    :v_asset_obj:channel::VARCHAR,
+    :v_asset_obj:asset_type::VARCHAR,
+    :v_asset_obj:content_body::VARCHAR,
+    :v_asset_obj:headline::VARCHAR,
+    :v_asset_obj:cta::VARCHAR,
+    COALESCE(:v_asset_obj:approval_status::VARCHAR, 'draft'),
+    :v_asset_obj:brand_voice_score::NUMBER,
     CURRENT_TIMESTAMP();
 
   RETURN :v_asset_id;
 END;
 $$;
 
-GRANT USAGE ON PROCEDURE WRITER_SNOW_DEMO.MARKETING.SAVE_CONTENT_ASSET(VARCHAR, VARIANT)
+GRANT USAGE ON PROCEDURE WRITER_SNOW_DEMO.MARKETING.SAVE_CONTENT_ASSET(VARCHAR, VARCHAR)
   TO ROLE WRITER_MARKETING_ROLE;
