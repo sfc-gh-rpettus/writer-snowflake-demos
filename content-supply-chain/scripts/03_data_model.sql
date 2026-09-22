@@ -625,8 +625,10 @@ CREATE OR REPLACE TABLE WRITER_SNOW_DEMO.MARKETING.CAMPAIGN_BRIEFS (
   BRIEF_CONTENT VARIANT        -- full brief JSON from Writer
 );
 
--- Write-back table: Writer needs SELECT + INSERT
-GRANT SELECT, INSERT ON TABLE WRITER_SNOW_DEMO.MARKETING.CAMPAIGN_BRIEFS TO ROLE WRITER_MARKETING_ROLE;
+-- Write-back table: Writer needs SELECT + INSERT + UPDATE
+-- UPDATE is required because SAVE_BRIEF upserts via MERGE (WHEN MATCHED THEN UPDATE)
+-- and runs EXECUTE AS CALLER, so the caller's role needs the UPDATE privilege.
+GRANT SELECT, INSERT, UPDATE ON TABLE WRITER_SNOW_DEMO.MARKETING.CAMPAIGN_BRIEFS TO ROLE WRITER_MARKETING_ROLE;
 
 -- ---------------------------------------------------------------------------
 -- CONTENT_ASSETS — Writer generates and writes these back via MCP save-asset
