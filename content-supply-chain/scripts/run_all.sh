@@ -13,10 +13,9 @@
 #   ./run_all.sh <your-connection>   # use named connection
 #   ./run_all.sh                  # uses SNOW_DEFAULT_CONNECTION env var
 #
-# Phase 2 objects (sentiment scoring, GEO queries, brand voice) are OPTIONAL and are
-# SKIPPED by default. They are not part of the quickstart path: CORTEX.SENTIMENT over
-# ~120K rows is slow and times out on a MEDIUM warehouse. To run them anyway:
-#   RUN_PHASE2=1 ./run_all.sh <your-connection>
+# This runs the Phase 1 demo, which is complete on its own. The optional Phase 2
+# objects (sentiment scoring, GEO queries, brand voice) have their own runner:
+#   ./run_phase2.sh <your-connection>
 #
 # Browser auth on accounts with no SAML IdP: the client id and secret for the built-in
 # SNOWFLAKE$LOCAL_APPLICATION integration are the literal string LOCAL_APPLICATION.
@@ -28,9 +27,6 @@
 set -e
 
 CONNECTION="${1:-${SNOW_DEFAULT_CONNECTION:-default}}"
-# Phase 2 is opt-in. RUN_PHASE2=1 enables it; legacy SKIP_PHASE2=0 also enables it.
-RUN_PHASE2="${RUN_PHASE2:-0}"
-if [ "${SKIP_PHASE2:-}" = "0" ]; then RUN_PHASE2=1; fi
 SCRIPTS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 DATA_DIR="$(cd "$SCRIPTS_DIR/../data" && pwd)"
 LOG_FILE="$SCRIPTS_DIR/setup_$(date +%Y%m%d_%H%M%S).log"
@@ -55,7 +51,7 @@ if ! command -v snow &>/dev/null; then
   echo "  https://docs.snowflake.com/en/developer-guide/snowflake-cli"
   echo ""
   echo "Or run each script manually in Snowsight in this order:"
-  ls "$SCRIPTS_DIR"/*.sql | sort | grep -v teardown
+  ls "$SCRIPTS_DIR"/*.sql | sort | grep -vE 'teardown|06_phase2'
   echo "  (load $DATA_DIR/campaign_library_seed.sql after 03_data_model.sql)"
   exit 1
 fi
@@ -117,22 +113,6 @@ echo ""
 run_script "05_analytics_and_grants.sql" \
   "Performance analytics DT + Final grant sweep" "1-2 min"
 
-# ── Step 6 (optional, opt-in) ─────────────────────────────────────────────────
-# Not part of the quickstart path. The script is kept in the repo and can be run
-# on its own; it is skipped unless RUN_PHASE2=1.
-if [ "$RUN_PHASE2" = "1" ]; then
-  header "Step 6 — Phase 2 Objects (OPTIONAL)"
-  warn "CORTEX.SENTIMENT on ~120K rows — slow, and times out on a MEDIUM warehouse."
-  echo ""
-  run_script "06_phase2_optional.sql" \
-    "Phase 2: sentiment, GEO, brand voice" "10-20 min"
-else
-  header "Step 6 — Phase 2 Objects (SKIPPED — not needed)"
-  info "Phase 1 demo is complete without these."
-  warn "To run later: RUN_PHASE2=1 ./run_all.sh $CONNECTION"
-  warn "Or directly:  snow sql -f 06_phase2_optional.sql -c $CONNECTION"
-fi
-
 # ── Done ──────────────────────────────────────────────────────────────────────
 echo ""
 echo -e "${GREEN}${BOLD}╔══════════════════════════════════════════╗"
@@ -144,5 +124,8 @@ echo "  1. Allow time for Cortex Search to finish indexing before testing"
 echo "  2. Grant OAuth integration (if needed):"
 echo "     snow sql -c $CONNECTION -q \"GRANT USAGE ON INTEGRATION WRITER_OAUTH TO ROLE WRITER_MARKETING_ROLE\""
 echo "  3. Before each demo: snow sql -f 99_demo_reset.sql -c $CONNECTION"
+echo ""
+echo "Optional Phase 2 (sentiment, GEO, brand voice) is a separate run:"
+echo "  ./run_phase2.sh $CONNECTION"
 echo ""
 echo "Log: $LOG_FILE  |  Issues: SETUP_NOTES.md"

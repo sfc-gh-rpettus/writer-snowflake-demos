@@ -39,11 +39,8 @@ cd scripts/
 ./run_all.sh <your-connection>
 ```
 
-To skip Phase 2 objects (not needed for Phase 1 demo):
-```bash
-SKIP_PHASE2=1 ./run_all.sh <your-connection>
-```
-
+That's the whole Phase 1 demo. The optional Phase 2 objects are a separate run —
+see [Phase 2](#phase-2--optional) below.
 
 ---
 
@@ -55,10 +52,33 @@ Open each script in a Snowsight worksheet and run in order. Use **Run All** (⌘
 |------|--------|-------|
 | 1 | `01_setup_and_foundation.sql` | ⚠️ See "Fresh Account" note below. Includes env + all reference tables. |
 | 2 | `02_bronze_data.sql` | Generates 50K customers, 2.2M events — recommend MEDIUM+ warehouse |
-| 3 | `03_data_model.sql` | DTs + AI-generated campaign library (CORTEX.COMPLETE calls) + write-back tables + procs |
+| 3 | `03_data_model.sql` | Gold DTs + campaign library table + write-back tables + procs |
+| 3b | `../data/campaign_library_seed.sql` | Frozen seed data — 100 campaigns. Load right after step 3. |
 | 4 | `04_ai_layer.sql` | Cortex Search + Semantic View + Agent + MCP Server. Allow time for Search indexing after. |
 | 5 | `05_analytics_and_grants.sql` | Performance analytics DT + final grant sweep |
-| 6 | `06_phase2_optional.sql` | **Optional** — not needed for Phase 1 demo |
+
+That completes the demo. `06_phase2_optional.sql` is **not** part of this path — see below.
+
+---
+
+## Phase 2 — Optional
+
+Phase 2 adds sentiment scoring, GEO queries, and brand voice objects. It is a
+**separate run** and is not required for the demo or the quickstart.
+
+```bash
+cd scripts/
+./run_phase2.sh <your-connection>
+```
+
+Or in Snowsight: open `06_phase2_optional.sql` and run it.
+
+Before you do, know what you're signing up for:
+
+- `CORTEX.SENTIMENT` over ~120K rows is slow, and it **times out on a MEDIUM warehouse**.
+  Size up to LARGE or above first.
+- It bills Cortex token consumption.
+- `run_all.sh` must have completed against the same connection first.
 
 ---
 
