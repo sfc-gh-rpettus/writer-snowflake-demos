@@ -827,7 +827,15 @@ GRANT USAGE ON PROCEDURE WRITER_SNOW_DEMO.MARKETING.ACTIVATE_SEGMENT(NUMBER, VAR
 -- Signature: (P_CAMPAIGN_ID VARCHAR, P_BRIEF_JSON VARCHAR)
 -- P_BRIEF_JSON is a JSON string — PARSE_JSON() is applied internally.
 -- Returns: BRIEF_ID string
+--
+-- The VARIANT overload is dropped first. Both overloads coexisting is ambiguous
+-- for the MCP GENERIC tool, whose identifier carries no signature and whose
+-- input_schema declares P_BRIEF_JSON as "string". Older deploys created the
+-- VARIANT version, so drop it explicitly rather than relying on CREATE OR REPLACE
+-- (which only replaces a matching signature).
 -- ---------------------------------------------------------------------------
+DROP PROCEDURE IF EXISTS WRITER_SNOW_DEMO.MARKETING.SAVE_BRIEF(VARCHAR, VARIANT);
+
 CREATE OR REPLACE PROCEDURE WRITER_SNOW_DEMO.MARKETING.SAVE_BRIEF(
   P_CAMPAIGN_ID VARCHAR,
   P_BRIEF_JSON  VARCHAR
@@ -883,7 +891,13 @@ GRANT USAGE ON PROCEDURE WRITER_SNOW_DEMO.MARKETING.SAVE_BRIEF(VARCHAR, VARCHAR)
 -- Signature: (P_BRIEF_ID VARCHAR, P_ASSET_JSON VARCHAR)
 -- P_ASSET_JSON is a JSON string — PARSE_JSON() is applied internally.
 -- Returns: ASSET_ID string
+--
+-- The VARIANT overload is dropped first, for the same reason as SAVE_BRIEF:
+-- the MCP GENERIC tool identifier carries no signature and input_schema
+-- declares P_ASSET_JSON as "string".
 -- ---------------------------------------------------------------------------
+DROP PROCEDURE IF EXISTS WRITER_SNOW_DEMO.MARKETING.SAVE_CONTENT_ASSET(VARCHAR, VARIANT);
+
 CREATE OR REPLACE PROCEDURE WRITER_SNOW_DEMO.MARKETING.SAVE_CONTENT_ASSET(
   P_BRIEF_ID   VARCHAR,
   P_ASSET_JSON VARCHAR
