@@ -22,6 +22,7 @@ set -e
 CONNECTION="${1:-${SNOW_DEFAULT_CONNECTION:-default}}"
 SKIP_PHASE2="${SKIP_PHASE2:-0}"
 SCRIPTS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+DATA_DIR="$(cd "$SCRIPTS_DIR/../data" && pwd)"
 LOG_FILE="$SCRIPTS_DIR/setup_$(date +%Y%m%d_%H%M%S).log"
 
 RED='\033[0;31m'; GREEN='\033[0;32m'; YELLOW='\033[1;33m'
@@ -45,6 +46,7 @@ if ! command -v snow &>/dev/null; then
   echo ""
   echo "Or run each script manually in Snowsight in this order:"
   ls "$SCRIPTS_DIR"/*.sql | sort | grep -v teardown
+  echo "  (load $DATA_DIR/campaign_library_seed.sql after 03_data_model.sql)"
   exit 1
 fi
 
@@ -52,11 +54,12 @@ run_script() {
   local file="$1"
   local label="$2"
   local est="$3"
+  local dir="${4:-$SCRIPTS_DIR}"
 
   header "$label  (~$est)"
   info "Running $file ..."
 
-  if snow sql -f "$SCRIPTS_DIR/$file" -c "$CONNECTION" >> "$LOG_FILE" 2>&1; then
+  if snow sql -f "$dir/$file" -c "$CONNECTION" >> "$LOG_FILE" 2>&1; then
     success "$label complete"
   else
     fail "$label FAILED — see $LOG_FILE"
@@ -85,7 +88,13 @@ info "Dynamic Tables initialize in background — continuing while they process.
 echo ""
 
 run_script "03_data_model.sql" \
-  "Gold DTs + Campaign library + Write-back tables + Procedures" "5-8 min"
+  "Gold DTs + Campaign library table + Write-back tables + Procedures" "1-2 min"
+
+# ── Step 3b ───────────────────────────────────────────────────────────────────
+# Campaign copy is loaded from frozen seed data instead of being generated with
+# ~300 CORTEX.COMPLETE calls — deterministic, free, and no model dependency.
+run_script "campaign_library_seed.sql" \
+  "Campaign library seed data (100 campaigns)" "15 sec" "$DATA_DIR"
 
 # ── Step 4 ────────────────────────────────────────────────────────────────────
 run_script "04_ai_layer.sql" \
