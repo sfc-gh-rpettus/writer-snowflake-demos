@@ -13,14 +13,24 @@
 #   ./run_all.sh <your-connection>   # use named connection
 #   ./run_all.sh                  # uses SNOW_DEFAULT_CONNECTION env var
 #
-# Skip Phase 2 (not needed for Phase 1 demo):
-#   SKIP_PHASE2=1 ./run_all.sh <your-connection>
+# Phase 2 objects (sentiment scoring, GEO queries, brand voice) are OPTIONAL and are
+# SKIPPED by default. They are not part of the quickstart path: CORTEX.SENTIMENT over
+# ~120K rows is slow and times out on a MEDIUM warehouse. To run them anyway:
+#   RUN_PHASE2=1 ./run_all.sh <your-connection>
+#
+# Browser auth on accounts with no SAML IdP: the client id and secret for the built-in
+# SNOWFLAKE$LOCAL_APPLICATION integration are the literal string LOCAL_APPLICATION.
+#   SNOWFLAKE_AUTHENTICATOR=OAUTH_AUTHORIZATION_CODE \
+#   SNOWFLAKE_OAUTH_CLIENT_ID=LOCAL_APPLICATION \
+#   SNOWFLAKE_OAUTH_CLIENT_SECRET=LOCAL_APPLICATION ./run_all.sh <your-connection>
 # =============================================================================
 
 set -e
 
 CONNECTION="${1:-${SNOW_DEFAULT_CONNECTION:-default}}"
-SKIP_PHASE2="${SKIP_PHASE2:-0}"
+# Phase 2 is opt-in. RUN_PHASE2=1 enables it; legacy SKIP_PHASE2=0 also enables it.
+RUN_PHASE2="${RUN_PHASE2:-0}"
+if [ "${SKIP_PHASE2:-}" = "0" ]; then RUN_PHASE2=1; fi
 SCRIPTS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 DATA_DIR="$(cd "$SCRIPTS_DIR/../data" && pwd)"
 LOG_FILE="$SCRIPTS_DIR/setup_$(date +%Y%m%d_%H%M%S).log"
@@ -107,17 +117,20 @@ echo ""
 run_script "05_analytics_and_grants.sql" \
   "Performance analytics DT + Final grant sweep" "1-2 min"
 
-# ── Step 6 (optional) ─────────────────────────────────────────────────────────
-if [ "$SKIP_PHASE2" = "1" ]; then
-  header "Step 6 — Phase 2 Objects (SKIPPED)"
-  warn "To run later: snow sql -f 06_phase2_optional.sql -c $CONNECTION"
-else
+# ── Step 6 (optional, opt-in) ─────────────────────────────────────────────────
+# Not part of the quickstart path. The script is kept in the repo and can be run
+# on its own; it is skipped unless RUN_PHASE2=1.
+if [ "$RUN_PHASE2" = "1" ]; then
   header "Step 6 — Phase 2 Objects (OPTIONAL)"
-  warn "CORTEX.SENTIMENT on ~120K rows — may be slow. Consider a larger warehouse."
-  warn "Skip with: SKIP_PHASE2=1 ./run_all.sh \$CONNECTION"
+  warn "CORTEX.SENTIMENT on ~120K rows — slow, and times out on a MEDIUM warehouse."
   echo ""
   run_script "06_phase2_optional.sql" \
     "Phase 2: sentiment, GEO, brand voice" "10-20 min"
+else
+  header "Step 6 — Phase 2 Objects (SKIPPED — not needed)"
+  info "Phase 1 demo is complete without these."
+  warn "To run later: RUN_PHASE2=1 ./run_all.sh $CONNECTION"
+  warn "Or directly:  snow sql -f 06_phase2_optional.sql -c $CONNECTION"
 fi
 
 # ── Done ──────────────────────────────────────────────────────────────────────
