@@ -17,6 +17,9 @@
 -- To regenerate this file from a live table, see REGENERATING below.
 -- =============================================================================
 
+USE ROLE SYSADMIN;
+USE WAREHOUSE WRITER_WH;
+
 TRUNCATE TABLE IF EXISTS WRITER_SNOW_DEMO.MARKETING.CAMPAIGN_LIBRARY;
 
 INSERT INTO WRITER_SNOW_DEMO.MARKETING.CAMPAIGN_LIBRARY
